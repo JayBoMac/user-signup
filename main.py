@@ -15,10 +15,46 @@
 # limitations under the License.
 #
 import webapp2
+import cgi
+
+def build_page(textarea_content):
+    user_label = "<label>Usename</label>"
+    user_input = "<input type=name/>"
+    textarea = "<textarea name='message'>" +  textarea_content + "</textarea>"
+
+    password_label = "<label>Password</label>"
+    password_input = "<input type=password/>"
+    textarea = "<textarea name='message'>" + textarea_content + "</textarea>"
+
+    vpassword_label = "<label>Verify Password</label>"
+    vpassword_input = "<input type=verify_password/>"
+    textarea = "<textarea name='message'>" + textarea_content + "</textarea>"
+
+    email_label = "<label>Email (optional)</label>"
+    email_input = "<input type=email/>"
+    textarea = "<textarea name='message'>" + textarea_content + "</textarea>"
+
+
+    submit = "<input type='submit'/>"
+
+    form = ("<form>" +
+            user_label + user_input + "<br>" +
+            password_label + password_input + "<br>"  +
+            vpassword_label + vpassword_input + "<br>" +
+            email_label + email_input + "<br>" +
+            submit + "</form>")
+
+    header ="<h1>Signup</h1>"
+
+    return header + form
 
 class MainHandler(webapp2.RequestHandler):
     def get(self):
-        self.response.write('Hello world!')
+        content = build_page("")
+        self.response.write(content)
+
+    def post(self):
+        self.response.write(content)
 
 app = webapp2.WSGIApplication([
     ('/', MainHandler)
