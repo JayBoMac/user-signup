@@ -1,91 +1,105 @@
 import webapp2
-import jinja2
+import cgi
+import re
 
-from google.appengine.ext import db
+# html boilerplate for header and footer
+page_header = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign Up</title>
+    <style type="text/css">
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+"""
 
-template_dir = os.path.join(os.path.dirname(__file__),'templates')
-jinja_env = jinja2.Environment(loader =jinja2.FileSystemLoader(template_dir),
-                               autoescape = True)
+page_footer = """
+</body>
+</html>
+"""
 
-def render_str(template, **params):
-    t = jinja_env.get_template(template)
-    return t.render(params)
-
-class BaseHandler(webapp2.RequestHandler):
-    def render(self, template, **kw):
-        self.response.out.write(render_str(template, **kw))
-
-    def write(self, *a, **kw):
-        self.response.out.write(*a, **kw)
-
-class Rot13(BaseHandler):
+class Index(webapp2.RequestHandler):
     def get(self):
-        self.render('rot13-form.html')
+        edit_header = "<h1>Signup</h1>"
+
+        usernameerror = self.request.get('uerror')
+        passworderror = self.request.get('perror')
+        emailerror = self.request.get('emerror')
+        username = self.request.get('username')
+        useremail = self.request.get('useremail')
+
+        form = """
+          <form action="/welcome" method="post">
+            <label>Username</label>
+                <input type="text" name="username" value="{uname}" required/> <font style="color:red" pattern="">{uerror}</font>
+            <br>
+            <label>Password</label>
+                <input type="password" name="password1" required/>
+            <br>
+            <label>Verify Password</label>
+                <input type="password" name="password2" required/> <font style="color:red" pattern="">{perror}</font>
+            <br>
+            <label>Email (optional)</label>
+                <input type="email" name="useremail" value="{uemail}"/> <font style="color:red" pattern="">{eerror}</font>
+            <br>
+            <input type="submit" value="Submit"/>
+          </form>
+        """.format(uname=username, uerror=usernameerror, perror=passworderror, uemail=useremail, eerror=emailerror)
+
+        main_content = edit_header + form
+        response = page_header + main_content + page_footer
+        self.response.write(response)
+
+
+
+class Welcome(webapp2.RequestHandler):
 
     def post(self):
-        rot13 = ''
-        text = self.request.get('text')
-        if text:
-            rot13 = text.encode('rot13')
 
-        self.render('rot13-form.html', text = rot13)
+        uerror = ""
+        perror = ""
+        emerror = ""
+        username = self.request.get('username')
+        password1 = self.request.get("password1")
+        password2 = self.request.get('password2')
+        useremail = self.request.get('useremail')
 
-USER_RE = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
-def valid_username(username):
-    return username and USER_RE.match(username)
+        user_re = re.compile(r"^[a-zA-Z0-9_-]{3,20}$")
+        password_re = re.compile(r"^.{3,20}$")
+        email_re = re.compile(r"^[\S]+@[\S]+.[\S]+$")
 
-PASS_RE = re.compile(r"^.{3,20}$")
-def valid_password(password):
-    return password and PASS_RE.match(password)
+        # check if passwords match
+        if not password1 == password2:
+            perror = "Passwords don't match."
+            self.redirect('/?perror={}&username={}&useremail={}'.format(cgi.escape(perror, quote=True),username,useremail))
 
-EMAIL_RE = re.compile(r'^[\S]@[\S]+\[\S]+$')
-def valid_email(email):
-    return not email or EMAIL_RE.match(email)
+        # check if password is valid
+        if password_re.match(password1) == None:
+            perror = "Invalid password, try again."
+            self.redirect('/?perror={}&username={}&useremail={}'.format(cgi.escape(perror, quote=True),username,useremail))
 
-class Signup(BaseHandler):
+        # check if username is valid
+        if user_re.match(username) == None:
+            uerror = "Invalid username, try again."
+            self.redirect('/?uerror={}&useremail={}'.format(cgi.escape(uerror, quote=True),useremail))
 
-def get(self):
-    self.render("signup-form.html")
+        # check if email is valid
+        if email_re.match(useremail) == None:
+            emerror = "Invalid email, try again."
+            self.redirect('/?username={}&emerror={}'.format(cgi.escape(emerror, quote=True),useremail))
 
-def post(self):
-    have_error = False
-    username = self.request.get("username")
-    password = self.request.get("password")
-    verify = self.request.get("verify")
-    email =self.request.get("email")
+        welcome_message = "<h1>Welcome, {0}!</h1>".format(username)
 
-    params = dict(username = username,
-                    email = email)
+        main_content = welcome_message
 
-    if not valid_username(username):
-        params['error_username'] = "That's not a valid username."
-        have_error = True
+        response = page_header + main_content + page_footer
+        self.response.write(response)
 
-    if not valid_password(password):
-        params['error_password'] = "That's not a valid password"
-        have_error = True
-    elif password != verify:
-        params['error_verify'] = "Your passwords didn't match"
-        have_error = True
-
-    if not valid_email(email):
-        params['error_mail'] = "That's not a valid email"
-        have_error = True
-
-    if have_error:
-        self.render('signup-form.html', **params)
-    else:
-        self.redirect('/unit2/welcome?username=' + username)
-
-class Welcome(BaseHandler):
-    def get(self):
-        username =self.request.get('username')
-        if valid_username(username):
-            self.render('welcome.html', username = username)
-        else:
-            self.redirec('/unit2/signup')
-
-app = webapp2.WSGIApplication([('/unit2/rot13', Rot13),
-                               ('/unit2/signup', Signup)
-                               ('/unit2/welcome', Welcome)],
-                               debug=True)
+app = webapp2.WSGIApplication([
+    ('/', Index),
+    ('/welcome', Welcome)
+], debug=True)
